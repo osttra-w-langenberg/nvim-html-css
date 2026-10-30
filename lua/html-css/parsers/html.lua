@@ -35,6 +35,10 @@ html.setup = function(bufnr)
     local lang = vim.treesitter.language.get_lang(vim.bo.filetype)
     html.lang = lang
 
+    if lang == "go" then
+        return { cdn = {}, raw_text = "" }
+    end
+
     if lang == "tsx" or lang == "javascript" then
         html.query = html.tsx -- Use TSX-specific query for TSX and JavaScript
     else

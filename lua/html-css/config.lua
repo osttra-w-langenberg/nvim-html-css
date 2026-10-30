@@ -1,5 +1,5 @@
 return {
-    enable_on = { "html" },
+    enable_on = { "html", "go" },
     handlers = {},
     peek = {
         enabled = true,

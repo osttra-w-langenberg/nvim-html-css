@@ -36,6 +36,41 @@ local function get_context_node(bufnr, position)
     return nil
 end
 
+--- Determines whether the given TSNode is in a class or id context
+--- Supports HTML/JSX attributes and Gomponents (Go) function calls like Class(...) and ID(...)
+---@param node TSNode|nil
+---@param bufnr integer
+---@return "class"|"id"|nil
+local function get_completion_context(node, bufnr)
+    local curr = node
+    while curr do
+        local node_type = curr:type()
+        if node_type == "attribute" or node_type == "jsx_attribute" then
+            local first_child = curr:child(0)
+            if first_child then
+                local attr_name = vim.treesitter.get_node_text(first_child, bufnr)
+                if attr_name == "class" or attr_name == "className" then
+                    return "class"
+                elseif attr_name == "id" then
+                    return "id"
+                end
+            end
+        elseif node_type == "call_expression" then
+            local func_node = curr:named_child(0)
+            if func_node then
+                local func_name = vim.treesitter.get_node_text(func_node, bufnr)
+                if func_name == "Class" or string.match(func_name, "%.Class$") then
+                    return "class"
+                elseif func_name == "ID" or string.match(func_name, "%.ID$") then
+                    return "id"
+                end
+            end
+        end
+        curr = curr:parent()
+    end
+    return nil
+end
+
 local function create_server(dispatchers)
     local closing = false
     local srv = {}
@@ -52,7 +87,7 @@ local function create_server(dispatchers)
                         willSaveWaitUntil = false,
                     },
                     completionProvider = {
-                        triggerCharacters = { '"', "'", " " },
+                        triggerCharacters = { '"', "'", " ", "`" },
                         resolveProvider = true,
                     },
                     hoverProvider = true,
@@ -79,25 +114,8 @@ local function create_server(dispatchers)
                 return true, 1
             end
 
-            local context = nil
             local node = get_context_node(bufnr, position)
-
-            while node do
-                if node:type() == "attribute" or node:type() == "jsx_attribute" then
-                    local first_child = node:child(0)
-                    if first_child then
-                        local attr_name = vim.treesitter.get_node_text(first_child, bufnr)
-                        if attr_name == "class" or attr_name == "className" then
-                            context = "class"
-                            break
-                        elseif attr_name == "id" then
-                            context = "id"
-                            break
-                        end
-                    end
-                end
-                node = node:parent()
-            end
+            local context = get_completion_context(node, bufnr)
 
             if not context then
                 callback(nil, { items = {} })
@@ -164,28 +182,9 @@ local function create_server(dispatchers)
                 return true, 1
             end
 
-            local context = nil
             local word = nil
             local node = get_context_node(bufnr, position)
-
-            -- Small helper to traverse up and check attributes
-            local curr = node
-            while curr do
-                if curr:type() == "attribute" or curr:type() == "jsx_attribute" then
-                    local first_child = curr:child(0)
-                    if first_child then
-                        local attr_name = vim.treesitter.get_node_text(first_child, bufnr)
-                        if attr_name == "class" or attr_name == "className" then
-                            context = "class"
-                            break
-                        elseif attr_name == "id" then
-                            context = "id"
-                            break
-                        end
-                    end
-                end
-                curr = curr:parent()
-            end
+            local context = get_completion_context(node, bufnr)
 
             if context and node then
                 -- Attempt to get the specific word under cursor (the class name)
@@ -231,28 +230,9 @@ local function create_server(dispatchers)
             end
 
             -- Identify word at cursor and context
-            local context = nil
             local word = nil
             local node = get_context_node(bufnr, position)
-
-            -- Helper to traverse up and check attributes (reused from definition)
-            local curr = node
-            while curr do
-                if curr:type() == "attribute" or curr:type() == "jsx_attribute" then
-                    local first_child = curr:child(0)
-                    if first_child then
-                        local attr_name = vim.treesitter.get_node_text(first_child, bufnr)
-                        if attr_name == "class" or attr_name == "className" then
-                            context = "class"
-                            break
-                        elseif attr_name == "id" then
-                            context = "id"
-                            break
-                        end
-                    end
-                end
-                curr = curr:parent()
-            end
+            local context = get_completion_context(node, bufnr)
 
             if context and node then
                 -- Attempt to get the specific word under cursor
